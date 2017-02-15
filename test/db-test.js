@@ -5,6 +5,7 @@ const uuid = require('uuid-base62')
 const r = require('rethinkdb')
 const Db = require('../')
 const fixtures = require('./fixtures')
+const utils = require('../lib/utils')
 
 test.beforeEach('setup database', async t => {
   const dbName = `platzigram_${uuid.v4()}`
@@ -75,4 +76,46 @@ test('list all images', async t => {
   let result = await db.getImages()
 
   t.is(created.length, result.length)
+})
+
+test('save user', async t => {
+  let db = t.context.db
+
+  t.is(typeof db.saveUser, 'function', 'saveUser')
+  let user = fixtures.getUser()
+  let plainPassword = user.password
+  let created = await db.saveUser(user)
+  t.is(user.username, created.username)
+  t.is(user.email, created.email)
+  t.is(user.name, created.name)
+  t.is(utils.encrypt(plainPassword), created.password)
+  t.is(typeof created.id, 'string')
+  t.truthy(created.createdAt)
+})
+test('get user', async t => {
+  let db = t.context.db
+
+  t.is(typeof db.getUser, 'function', 'getUser is a function')
+
+  let user = fixtures.getUser()
+  let created = await db.saveUser(user)
+  let result = await db.getUser(user.username)
+
+  t.deepEqual(created, result)
+})
+
+test('authenticate user', async t => {
+  let db = t.context.db
+
+  t.is(typeof db.authenticate, 'function', 'authenticate is a function')
+
+  let user = fixtures.getUser()
+  let plainPassword = user.password
+  await db.saveUser(user)
+
+  let success = await db.authenticate(user.username, plainPassword)
+  t.true(success)
+
+  let fail = await db.authenticate(user.username, 'foo')
+  t.false(fail)
 })
